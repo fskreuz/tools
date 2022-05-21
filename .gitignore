@@ -1,0 +1,11 @@
+.*
+!.editorconfig
+!.gitignore
+!.github
+!.nvmrc
+
+*.log
+*.tgz
+*.bak
+
+build/
