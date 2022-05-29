@@ -37,6 +37,12 @@ const diagnostics = ({ actual, expected, stack }) => {
   return block.join('\n\n').replace(/^(.*)/gm, '# $1')
 }
 
+const timeout = () => new Promise((resolve, reject) => {
+  setTimeout(() => {
+    reject(new Error('Test timed out.'))
+  }, 3000)
+})
+
 const runner = async (modules) => {
   const length = modules.reduce((c, v) => c + v.tests.length, 0)
   let testNumber = 0
@@ -54,7 +60,7 @@ const runner = async (modules) => {
 
       if (test.run) {
         try {
-          await test.callback()
+          await Promise.race([test.callback(), timeout()])
           log.push(`ok ${testLine}`)
         } catch (error) {
           log.push(`not ok ${testLine}\n${diagnostics(error)}`)
