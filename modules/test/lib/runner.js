@@ -1,5 +1,5 @@
 const noop = () => { }
-const modules = []
+const tests = []
 
 const TestError = class extends Error {
   constructor (result, ...params) {
@@ -8,22 +8,30 @@ const TestError = class extends Error {
   }
 }
 
+const testDefaults = {
+  name: 'Test Defaults',
+  run: true,
+  expectSuccess: true,
+  getMessage: (testNumber, test) => `${testNumber} ${test}`,
+  callback: noop
+}
+
 const testConfig = {
   run: true,
   expectSuccess: true,
-  getMessage: (testNumber, module, test) => `${testNumber} ${module} - ${test}`
+  getMessage: (testNumber, test) => `${testNumber} ${test}`
 }
 
 const todoConfig = {
   run: true,
   expectSuccess: false,
-  getMessage: (testNumber, module, test) => `${testNumber} # TODO ${module} - ${test}`
+  getMessage: (testNumber, test) => `${testNumber} # TODO ${test}`
 }
 
 const skipConfig = {
   run: false,
   expectSuccess: false,
-  getMessage: (testNumber, module, test) => `${testNumber} # SKIP ${module} - ${test}`
+  getMessage: (testNumber, test) => `${testNumber} # SKIP ${test}`
 }
 
 const diagnostics = ({ actual, expected, stack }) => {
@@ -43,35 +51,29 @@ const timeout = () => new Promise((resolve, reject) => {
   }, 3000)
 })
 
-const runner = async (modules) => {
-  const length = modules.reduce((c, v) => c + v.tests.length, 0)
-  let testNumber = 0
+const runner = async (tests) => {
   let isFail = false
   const log = []
 
   log.push('TAP version 13')
-  log.push(`1..${length}`)
+  log.push(`1..${tests.length}`)
 
-  for (const module of modules) {
-    for (const test of module.tests) {
-      testNumber = testNumber + 1
+  for (const [index, test] of tests.entries()) {
+    const testLine = test.getMessage(index + 1, test.name)
 
-      const testLine = test.getMessage(testNumber, module.name, test.name)
-
-      if (test.run) {
-        try {
-          await Promise.race([test.callback(), timeout()])
-          log.push(`ok ${testLine}`)
-        } catch (error) {
-          log.push(`not ok ${testLine}\n${diagnostics(error)}`)
-
-          if (test.expectSuccess) {
-            isFail = true
-          }
-        }
-      } else {
+    if (test.run) {
+      try {
+        await Promise.race([test.callback(), timeout()])
         log.push(`ok ${testLine}`)
+      } catch (error) {
+        log.push(`not ok ${testLine}\n${diagnostics(error)}`)
+
+        if (test.expectSuccess) {
+          isFail = true
+        }
       }
+    } else {
+      log.push(`ok ${testLine}`)
     }
   }
 
@@ -81,60 +83,40 @@ const runner = async (modules) => {
 }
 
 /**
- * Creates a test module.
+ * Defines a runnable test.
  *
- * @param {string} moduleName The module's name.
+ * @param {string} name The name of the test.
+ * @param {Function} callback The test body.
  */
-export const module = (moduleName) => {
-  const testDefaults = {
-    name: 'Test Defaults',
-    run: true,
-    expectSuccess: true,
-    getMessage: (testNumber, module, test) => `${testNumber} ${module} - ${test}`,
-    callback: noop
-  }
+export const test = (name, callback = noop) => {
+  tests.push({ ...testDefaults, ...testConfig, name, callback })
+}
 
-  // Each module has its own instance of the tests array.
-  const module = { name: moduleName, tests: [] }
+/**
+ * Defines a test whose result is not expected to pass.
+ *
+ * @param {string} name The name of the test.
+ * @param {Function} callback The test body.
+ */
+export const todo = (name, callback = noop) => {
+  tests.push({ ...testDefaults, ...todoConfig, name, callback })
+}
 
-  modules.push(module)
-
-  return {
-    /**
-     * Defines a runnable test.
-     *
-     * @param {string} testName The name of the test.
-     * @param {Function} callback The test body.
-     */
-    test: (testName, callback = noop) => {
-      module.tests.push({ ...testDefaults, ...testConfig, callback, name: testName })
-    },
-    /**
-     * Defines a test whose result is not expected to pass.
-     *
-     * @param {string} testName The name of the test.
-     * @param {Function} callback The test body.
-     */
-    todo: (testName, callback = noop) => {
-      module.tests.push({ ...testDefaults, ...todoConfig, callback, name: testName })
-    },
-    /**
-     * Defines a test that will be skipped.
-     *
-     * @param {string} testName The name of the test.
-     * @param {Function} callback The test body.
-     */
-    skip: (testName, callback = noop) => {
-      module.tests.push({ ...testDefaults, ...skipConfig, callback, name: testName })
-    }
-  }
+/**
+ * Defines a test that will be skipped.
+ *
+ * @param {string} name The name of the test.
+ * @param {Function} callback The test body.
+ */
+export const skip = (name, callback = noop) => {
+  tests.push({ ...testDefaults, ...skipConfig, name, callback })
 }
 
 // Test setup happens in the same tick as the execution of the script.
 // Test execution happens in some tick in the future.
 setTimeout(async () => {
   try {
-    const result = await runner(modules)
+    const result = await runner(tests)
     console.log(result)
   } catch (e) {
     // In tools like Gulp, logs are sent to stderr when a non-zero is returned.
