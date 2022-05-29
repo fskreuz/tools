@@ -1,5 +1,5 @@
 import { test, deepEqual, equal, notEqual } from '../test/lib.js'
-import { combineReducers, createApp } from './lib.js'
+import { combineReducers, createApp, Action } from './lib.js'
 
 test('Order of effect, reduce, view, and render', () => {
   return new Promise((resolve, reject) => {
@@ -8,7 +8,7 @@ test('Order of effect, reduce, view, and render', () => {
 
     const effect = (state, { type, payload }, dispatch) => {
       switch (type) {
-        case 'INIT':
+        case Action.Init:
           result.push('effect')
           dispatch('EFFECT_DISPATCH', null)
           break
@@ -56,6 +56,94 @@ test('Reducer initial state', () => {
     }
 
     createApp({ reduce, view })
+  })
+})
+
+test('effect error as UNCAUGHT_ERROR action', () => {
+  return new Promise((resolve, reject) => {
+    let hit = false
+
+    const effect = (state, { type, payload }) => {
+      switch (type) {
+        case Action.Init:
+          // Cause this tick to crash
+          throw new Error('Stray error')
+        case Action.UncaughtError:
+          // UNCAUGHT_ERROR was dispatched
+          hit = true
+          break
+      }
+    }
+    // Copy object to cause render to be called.
+    const reduce = s => ({ ...s })
+    const render = () => {
+      if (hit) resolve()
+      else reject(new Error(`${Action.UncaughtError} was not dispatched`))
+    }
+
+    createApp({ effect, reduce, render })
+  })
+})
+
+test('reduce error as UNCAUGHT_ERROR action', () => {
+  return new Promise((resolve, reject) => {
+    let hit = false
+
+    const effect = (state, { type, payload }) => {
+      switch (type) {
+        case Action.UncaughtError:
+          // UNCAUGHT_ERROR was dispatched
+          hit = true
+          break
+      }
+    }
+    // Copy object so that it's treated as new state.
+    const reduce = (state, { type, payload }) => {
+      switch (type) {
+        case Action.Init:
+          // Cause this tick to crash
+          throw new Error('Stray error')
+        default:
+          // Copy object to cause render to be called.
+          return { ...state }
+      }
+    }
+    const render = () => {
+      if (hit) resolve()
+      else reject(new Error(`${Action.UncaughtError} was not dispatched`))
+    }
+
+    createApp({ effect, reduce, render })
+  })
+})
+
+test('render error as UNCAUGHT_ERROR action', () => {
+  return new Promise((resolve, reject) => {
+    let hit = false
+    let hasRendered = false
+
+    const effect = (state, { type, payload }) => {
+      switch (type) {
+        case Action.UncaughtError:
+          // UNCAUGHT_ERROR was dispatched
+          hit = true
+          break
+      }
+    }
+    // Copy object to cause render to be called.
+    const reduce = s => ({ ...s })
+    const render = () => {
+      if (hasRendered) {
+        if (hit) resolve()
+        else reject(new Error(`${Action.UncaughtError} was not dispatched`))
+      } else {
+        hasRendered = true
+        // Cause this tick to crash
+        throw new Error('Stray error')
+      }
+    }
+
+    createApp({ effect, reduce, render })
   })
 })
 

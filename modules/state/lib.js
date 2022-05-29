@@ -3,22 +3,31 @@ const defaultReduce = s => s
 const defaultView = () => null
 const defaultRender = () => { }
 
+export const Action = {
+  Init: 'ACTION_INIT',
+  UncaughtError: 'ACTION_UNCAUGHT_ERROR'
+}
+
 export const createApp = ({ effect = defaultEffect, reduce = defaultReduce, view = defaultView, render = defaultRender }) => {
   let root, state
 
   const dispatch = (type, payload = null) => {
     const action = { type, payload }
 
-    effect(state, action, (...args) => setTimeout(() => dispatch(...args)))
-    const newState = reduce(state, action)
+    try {
+      effect(state, action, (...args) => setTimeout(() => dispatch(...args)))
+      const newState = reduce(state, action)
 
-    if (state === newState) return
+      if (state === newState) return
 
-    state = newState
-    root = render(view({ state, dispatch }), root)
+      state = newState
+      root = render(view({ state, dispatch }), root)
+    } catch (error) {
+      setTimeout(() => dispatch(Action.UncaughtError, error))
+    }
   }
 
-  setTimeout(() => dispatch('INIT', Date.now()))
+  setTimeout(() => dispatch(Action.Init, Date.now()))
 
   return dispatch
 }
