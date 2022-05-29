@@ -1,7 +1,5 @@
-import { module, deepEqual, equal, notEqual } from '../test/lib.js'
+import { test, deepEqual, equal, notEqual } from '../test/lib.js'
 import { combineReducers, createApp } from './lib.js'
-
-const { test } = module('state/state')
 
 test('Order of effect, reduce, view, and render', () => {
   return new Promise((resolve, reject) => {

@@ -1,6 +1,4 @@
-import { module, ok, equal, notEqual, deepEqual, notDeepEqual, throws, rejects } from './lib.js'
-
-const { test } = module('test/harness')
+import { test, ok, equal, notEqual, deepEqual, notDeepEqual, throws, rejects } from './lib.js'
 
 test('equal', () => {
   equal(1, 1, 'numbers')
